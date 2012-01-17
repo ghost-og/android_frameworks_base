@@ -26,7 +26,7 @@ LOCAL_PATH := $(call my-dir)
 # TODO: find a more appropriate way to do this.
 framework_res_source_path := APPS/framework-res_intermediates/src
 
-# the library
+# the library.
 # ============================================================
 include $(CLEAR_VARS)
 
