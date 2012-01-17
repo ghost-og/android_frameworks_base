@@ -1,18 +1,18 @@
 /*
- * Copyright (C) 2007 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Copyright (C) 2007 The Android Open Source Project
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+* http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package com.android.internal.widget;
 
@@ -53,8 +53,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.TimeZone;
 
 /**
- * Utilities for the lock patten and its settings.
- */
+* Utilities for the lock patten and its settings.
+*/
 public class LockPatternUtils {
 
     private static final String TAG = "LockPatternUtils";
@@ -64,45 +64,46 @@ public class LockPatternUtils {
     private static final String LOCK_PASSWORD_FILE = "password.key";
 
     /**
-     * The maximum number of incorrect attempts before the user is prevented
-     * from trying again for {@link #FAILED_ATTEMPT_TIMEOUT_MS}.
-     */
+* The maximum number of incorrect attempts before the user is prevented
+* from trying again for {@link #FAILED_ATTEMPT_TIMEOUT_MS}.
+*/
     public static final int FAILED_ATTEMPTS_BEFORE_TIMEOUT = 5;
 
     /**
-     * The number of incorrect attempts before which we fall back on an alternative
-     * method of verifying the user, and resetting their lock pattern.
-     */
+* The number of incorrect attempts before which we fall back on an alternative
+* method of verifying the user, and resetting their lock pattern.
+*/
     public static final int FAILED_ATTEMPTS_BEFORE_RESET = 20;
 
     /**
-     * How long the user is prevented from trying again after entering the
-     * wrong pattern too many times.
-     */
+* How long the user is prevented from trying again after entering the
+* wrong pattern too many times.
+*/
     public static final long FAILED_ATTEMPT_TIMEOUT_MS = 30000L;
 
     /**
-     * The interval of the countdown for showing progress of the lockout.
-     */
+* The interval of the countdown for showing progress of the lockout.
+*/
     public static final long FAILED_ATTEMPT_COUNTDOWN_INTERVAL_MS = 1000L;
 
     /**
-     * The minimum number of dots in a valid pattern.
-     */
+* The minimum number of dots in a valid pattern.
+*/
     public static final int MIN_LOCK_PATTERN_SIZE = 4;
 
     /**
-     * The minimum number of dots the user must include in a wrong pattern
-     * attempt for it to be counted against the counts that affect
-     * {@link #FAILED_ATTEMPTS_BEFORE_TIMEOUT} and {@link #FAILED_ATTEMPTS_BEFORE_RESET}
-     */
+* The minimum number of dots the user must include in a wrong pattern
+* attempt for it to be counted against the counts that affect
+* {@link #FAILED_ATTEMPTS_BEFORE_TIMEOUT} and {@link #FAILED_ATTEMPTS_BEFORE_RESET}
+*/
     public static final int MIN_PATTERN_REGISTER_FAIL = 3;
 
     private final static String LOCKOUT_PERMANENT_KEY = "lockscreen.lockedoutpermanently";
     private final static String LOCKOUT_ATTEMPT_DEADLINE = "lockscreen.lockoutattemptdeadline";
     private final static String PATTERN_EVER_CHOSEN_KEY = "lockscreen.patterneverchosen";
-    public final static String PASSWORD_TYPE_KEY = "lockscreen.password_type";
     private final static String LOCK_PASSWORD_SALT_KEY = "lockscreen.password_salt";
+    private final static String LOCK_FINGER_ENABLED = "lockscreen.lockfingerenabled";
+    public final static String PASSWORD_TYPE_KEY = "lockscreen.password_type";
 
     private final Context mContext;
     private final ContentResolver mContentResolver;
@@ -113,6 +114,12 @@ public class LockPatternUtils {
     private static final AtomicBoolean sHaveNonZeroPatternFile = new AtomicBoolean(false);
     private static final AtomicBoolean sHaveNonZeroPasswordFile = new AtomicBoolean(false);
     private static FileObserver sPasswordObserver;
+
+    private Object am = null;
+    private AuthentecLoader loader = null;
+    private Class AM_STATUS = null;
+    private Class AuthentecMobile = null;
+    private Class TSM = null;
 
     public DevicePolicyManager getDevicePolicyManager() {
         if (mDevicePolicyManager == null) {
@@ -126,8 +133,8 @@ public class LockPatternUtils {
         return mDevicePolicyManager;
     }
     /**
-     * @param contentResolver Used to look up and save settings.
-     */
+* @param contentResolver Used to look up and save settings.
+*/
     public LockPatternUtils(Context context) {
         mContext = context;
         mContentResolver = context.getContentResolver();
@@ -137,7 +144,7 @@ public class LockPatternUtils {
             String dataSystemDirectory =
                     android.os.Environment.getDataDirectory().getAbsolutePath() +
                     SYSTEM_DIRECTORY;
-            sLockPatternFilename =  dataSystemDirectory + LOCK_PATTERN_FILE;
+            sLockPatternFilename = dataSystemDirectory + LOCK_PATTERN_FILE;
             sLockPasswordFilename = dataSystemDirectory + LOCK_PASSWORD_FILE;
             sHaveNonZeroPatternFile.set(new File(sLockPatternFilename).length() > 0);
             sHaveNonZeroPasswordFile.set(new File(sLockPasswordFilename).length() > 0);
@@ -156,6 +163,14 @@ public class LockPatternUtils {
                 };
             sPasswordObserver.startWatching();
         }
+
+	try {
+	    loader = AuthentecLoader.getInstance(context);
+	    AM_STATUS = loader.getAMStatus();
+	    TSM = loader.getTSM();
+	    AuthentecMobile = loader.getAuthentecMobile();
+	    am = loader.getAuthentecMobileInstance();
+	} catch (Exception e){e.printStackTrace();}
     }
 
     public int getRequestedMinimumPasswordLength() {
@@ -164,18 +179,18 @@ public class LockPatternUtils {
 
 
     /**
-     * Gets the device policy password mode. If the mode is non-specific, returns
-     * MODE_PATTERN which allows the user to choose anything.
-     */
+* Gets the device policy password mode. If the mode is non-specific, returns
+* MODE_PATTERN which allows the user to choose anything.
+*/
     public int getRequestedPasswordQuality() {
         return getDevicePolicyManager().getPasswordQuality(null);
     }
 
     /**
-     * Returns the actual password mode, as set by keyguard after updating the password.
-     *
-     * @return
-     */
+* Returns the actual password mode, as set by keyguard after updating the password.
+*
+* @return
+*/
     public void reportFailedPasswordAttempt() {
         getDevicePolicyManager().reportFailedPasswordAttempt();
     }
@@ -185,11 +200,11 @@ public class LockPatternUtils {
     }
 
     /**
-     * Check to see if a pattern matches the saved pattern.  If no pattern exists,
-     * always returns true.
-     * @param pattern The pattern to check.
-     * @return Whether the pattern matches the stored one.
-     */
+* Check to see if a pattern matches the saved pattern. If no pattern exists,
+* always returns true.
+* @param pattern The pattern to check.
+* @return Whether the pattern matches the stored one.
+*/
     public boolean checkPattern(List<LockPatternView.Cell> pattern) {
         try {
             // Read all the bytes from the file
@@ -210,11 +225,11 @@ public class LockPatternUtils {
     }
 
     /**
-     * Check to see if a password matches the saved password.  If no password exists,
-     * always returns true.
-     * @param password The password to check.
-     * @return Whether the password matches the stored one.
-     */
+* Check to see if a password matches the saved password. If no password exists,
+* always returns true.
+* @param password The password to check.
+* @return Whether the password matches the stored one.
+*/
     public boolean checkPassword(String password) {
         try {
             // Read all the bytes from the file
@@ -235,35 +250,43 @@ public class LockPatternUtils {
     }
 
     /**
-     * Check to see if the user has stored a lock pattern.
-     * @return Whether a saved pattern exists.
-     */
+    * Check to see if the user has stored a lock pattern.
+    * @return Whether a saved pattern exists.
+    */
     public boolean savedPatternExists() {
         return sHaveNonZeroPatternFile.get();
     }
 
     /**
-     * Check to see if the user has stored a lock pattern.
-     * @return Whether a saved pattern exists.
-     */
+    * Check to see if the user has stored a lock pattern.
+    * @return Whether a saved pattern exists.
+    */
     public boolean savedPasswordExists() {
         return sHaveNonZeroPasswordFile.get();
     }
 
     /**
-     * Return true if the user has ever chosen a pattern.  This is true even if the pattern is
-     * currently cleared.
-     *
-     * @return True if the user has ever chosen a pattern.
+     * Check to see if the user has stored a finger.
+     * @return Wether a saved finger exists.
      */
+    public boolean savedFingerExists() {
+	return true;
+    }
+
+    /**
+    * Return true if the user has ever chosen a pattern. This is true even if the pattern is
+    * currently cleared.
+    *
+    * @return True if the user has ever chosen a pattern.
+    */
     public boolean isPatternEverChosen() {
         return getBoolean(PATTERN_EVER_CHOSEN_KEY);
     }
 
     /**
-     * Used by device policy manager to validate the current password
-     * information it has.
-     */
+* Used by device policy manager to validate the current password
+* information it has.
+*/
     public int getActivePasswordQuality() {
         int activePasswordQuality = DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED;
         switch (getKeyguardStoredPasswordQuality()) {
@@ -287,13 +310,18 @@ public class LockPatternUtils {
                     activePasswordQuality = DevicePolicyManager.PASSWORD_QUALITY_ALPHANUMERIC;
                 }
                 break;
+	    case DevicePolicyManager.PASSWORD_QUALITY_FINGER:
+		if (isLockFingerEnabled()) {
+		    activePasswordQuality = DevicePolicyManager.PASSWORD_QUALITY_FINGER;
+		}
+		break;
         }
         return activePasswordQuality;
     }
 
     /**
-     * Clear any lock pattern or password.
-     */
+* Clear any lock pattern or password.
+*/
     public void clearLock() {
         getDevicePolicyManager().setActivePasswordState(
                 DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED, 0);
@@ -304,12 +332,12 @@ public class LockPatternUtils {
     }
 
     /**
-     * Save a lock pattern.
-     * @param pattern The new pattern to save.
-     */
+* Save a lock pattern.
+* @param pattern The new pattern to save.
+*/
     public void saveLockPattern(List<LockPatternView.Cell> pattern) {
         // Compute the hash
-        final byte[] hash  = LockPatternUtils.patternToHash(pattern);
+        final byte[] hash = LockPatternUtils.patternToHash(pattern);
         try {
             // Write the hash to file
             RandomAccessFile raf = new RandomAccessFile(sLockPatternFilename, "rw");
@@ -340,8 +368,8 @@ public class LockPatternUtils {
     }
 
     /**
-     * Compute the password quality from the given password string.
-     */
+* Compute the password quality from the given password string.
+*/
     static public int computePasswordQuality(String password) {
         boolean hasDigit = false;
         boolean hasNonDigit = false;
@@ -367,12 +395,12 @@ public class LockPatternUtils {
     }
 
     /**
-     * Save a lock password.  Does not ensure that the password is as good
-     * as the requested mode, but will adjust the mode to be as good as the
-     * pattern.
-     * @param password The password to save
-     * @param quality {@see DevicePolicyManager#getPasswordQuality(android.content.ComponentName)}
-     */
+* Save a lock password. Does not ensure that the password is as good
+* as the requested mode, but will adjust the mode to be as good as the
+* pattern.
+* @param password The password to save
+* @param quality {@see DevicePolicyManager#getPasswordQuality(android.content.ComponentName)}
+*/
     public void saveLockPassword(String password, int quality) {
         // Compute the hash
         final byte[] hash = passwordToHash(password);
@@ -411,20 +439,20 @@ public class LockPatternUtils {
     }
 
     /**
-     * Retrieves the quality mode we're in.
-     * {@see DevicePolicyManager#getPasswordQuality(android.content.ComponentName)}
-     *
-     * @return stored password quality
-     */
+* Retrieves the quality mode we're in.
+* {@see DevicePolicyManager#getPasswordQuality(android.content.ComponentName)}
+*
+* @return stored password quality
+*/
     public int getKeyguardStoredPasswordQuality() {
         return (int) getLong(PASSWORD_TYPE_KEY, DevicePolicyManager.PASSWORD_QUALITY_SOMETHING);
     }
 
     /**
-     * Deserialize a pattern.
-     * @param string The pattern serialized with {@link #patternToString}
-     * @return The pattern.
-     */
+* Deserialize a pattern.
+* @param string The pattern serialized with {@link #patternToString}
+* @return The pattern.
+*/
     public static List<LockPatternView.Cell> stringToPattern(String string) {
         List<LockPatternView.Cell> result = Lists.newArrayList();
 
@@ -437,10 +465,10 @@ public class LockPatternUtils {
     }
 
     /**
-     * Serialize a pattern.
-     * @param pattern The pattern.
-     * @return The pattern in string form.
-     */
+* Serialize a pattern.
+* @param pattern The pattern.
+* @return The pattern in string form.
+*/
     public static String patternToString(List<LockPatternView.Cell> pattern) {
         if (pattern == null) {
             return "";
@@ -456,12 +484,12 @@ public class LockPatternUtils {
     }
 
     /*
-     * Generate an SHA-1 hash for the pattern. Not the most secure, but it is
-     * at least a second level of protection. First level is that the file
-     * is in a location only readable by the system process.
-     * @param pattern the gesture pattern.
-     * @return the hash of the pattern in a byte array.
-     */
+* Generate an SHA-1 hash for the pattern. Not the most secure, but it is
+* at least a second level of protection. First level is that the file
+* is in a location only readable by the system process.
+* @param pattern the gesture pattern.
+* @return the hash of the pattern in a byte array.
+*/
     private static byte[] patternToHash(List<LockPatternView.Cell> pattern) {
         if (pattern == null) {
             return null;
@@ -498,12 +526,12 @@ public class LockPatternUtils {
     }
 
     /*
-     * Generate a hash for the given password. To avoid brute force attacks, we use a salted hash.
-     * Not the most secure, but it is at least a second level of protection. First level is that
-     * the file is in a location only readable by the system process.
-     * @param password the gesture pattern.
-     * @return the hash of the pattern in a byte array.
-     */
+* Generate a hash for the given password. To avoid brute force attacks, we use a salted hash.
+* Not the most secure, but it is at least a second level of protection. First level is that
+* the file is in a location only readable by the system process.
+* @param password the gesture pattern.
+* @return the hash of the pattern in a byte array.
+*/
      public byte[] passwordToHash(String password) {
         if (password == null) {
             return null;
@@ -514,29 +542,21 @@ public class LockPatternUtils {
             byte[] saltedPassword = (password + getSalt()).getBytes();
             byte[] sha1 = MessageDigest.getInstance(algo = "SHA-1").digest(saltedPassword);
             byte[] md5 = MessageDigest.getInstance(algo = "MD5").digest(saltedPassword);
-            hashed = toHex(sha1, md5);
+            hashed = (toHex(sha1) + toHex(md5)).getBytes();
         } catch (NoSuchAlgorithmException e) {
             Log.w(TAG, "Failed to encode string because of missing algorithm: " + algo);
         }
         return hashed;
     }
 
-    private static final byte[] HEX_CHARS = new byte[]{
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
-    };
-
-    private static byte[] toHex(final byte[] array1, final byte[] array2) {
-        final byte[] result = new byte[(array1.length + array2.length) * 2];
-        int i = 0;
-        for (final byte b : array1) {
-            result[i++] = HEX_CHARS[(b >> 4) & 0xf];
-            result[i++] = HEX_CHARS[b & 0xf];
+    private static String toHex(byte[] ary) {
+        final String hex = "0123456789ABCDEF";
+        String ret = "";
+        for (int i = 0; i < ary.length; i++) {
+            ret += hex.charAt((ary[i] >> 4) & 0xf);
+            ret += hex.charAt(ary[i] & 0xf);
         }
-        for (final byte b : array2) {
-            result[i++] = HEX_CHARS[(b >> 4) & 0xf];
-            result[i++] = HEX_CHARS[b & 0xf];
-        }
-        return result;
+	return ret;
     }
 
     /**
@@ -560,10 +580,31 @@ public class LockPatternUtils {
     }
 
     /**
+     * @return Whether the lock finger is enabled.
+     */
+    public boolean isLockFingerEnabled() {
+	return getBoolean(LOCK_FINGER_ENABLED)
+		&& getLong(PASSWORD_TYPE_KEY, 0)
+			== DevicePolicyManager.PASSWORD_QUALITY_FINGER;
+    }
+
+    /**
      * Set whether the lock pattern is enabled.
      */
     public void setLockPatternEnabled(boolean enabled) {
         setBoolean(Settings.Secure.LOCK_PATTERN_ENABLED, enabled);
+    }
+
+    /**
+     * Set whether the lock finger is enabled.
+     */
+    public void setLockFingerEnabled(boolean enabled) {
+        setBoolean(LOCK_FINGER_ENABLED, enabled);
+        if (enabled) {
+            setLong(PASSWORD_TYPE_KEY, DevicePolicyManager.PASSWORD_QUALITY_FINGER);
+        } else {
+            setLong(PASSWORD_TYPE_KEY, DevicePolicyManager.PASSWORD_QUALITY_SOMETHING);
+        }
     }
 
     /**
@@ -574,28 +615,28 @@ public class LockPatternUtils {
     }
 
     /**
-     * Set whether the visible pattern is enabled.
-     */
+* Set whether the visible pattern is enabled.
+*/
     public void setVisiblePatternEnabled(boolean enabled) {
         setBoolean(Settings.Secure.LOCK_PATTERN_VISIBLE, enabled);
     }
 
     /**
-     * @return Whether tactile feedback for the pattern is enabled.
-     */
+* @return Whether tactile feedback for the pattern is enabled.
+*/
     public boolean isTactileFeedbackEnabled() {
         return getBoolean(Settings.Secure.LOCK_PATTERN_TACTILE_FEEDBACK_ENABLED);
     }
 
     /**
-     * Set whether tactile feedback for the pattern is enabled.
-     */
+* Set whether tactile feedback for the pattern is enabled.
+*/
     public void setTactileFeedbackEnabled(boolean enabled) {
         setBoolean(Settings.Secure.LOCK_PATTERN_TACTILE_FEEDBACK_ENABLED, enabled);
     }
     
     public void setVisibleDotsEnabled(boolean enabled) {
-        setBoolean(Settings.Secure.LOCK_DOTS_VISIBLE, enabled);        
+        setBoolean(Settings.Secure.LOCK_DOTS_VISIBLE, enabled);
     }
     
     public boolean isVisibleDotsEnabled() {
@@ -603,7 +644,7 @@ public class LockPatternUtils {
     }
     
     public void setShowErrorPath(boolean enabled) {
-        setBoolean(Settings.Secure.LOCK_SHOW_ERROR_PATH, enabled);        
+        setBoolean(Settings.Secure.LOCK_SHOW_ERROR_PATH, enabled);
     }
     
     public boolean isShowErrorPath() {
@@ -651,10 +692,10 @@ public class LockPatternUtils {
     }
 
     /**
-     * Set and store the lockout deadline, meaning the user can't attempt his/her unlock
-     * pattern until the deadline has passed.
-     * @return the chosen deadline.
-     */
+* Set and store the lockout deadline, meaning the user can't attempt his/her unlock
+* pattern until the deadline has passed.
+* @return the chosen deadline.
+*/
     public long setLockoutAttemptDeadline() {
         final long deadline = SystemClock.elapsedRealtime() + FAILED_ATTEMPT_TIMEOUT_MS;
         setLong(LOCKOUT_ATTEMPT_DEADLINE, deadline);
@@ -662,10 +703,10 @@ public class LockPatternUtils {
     }
 
     /**
-     * @return The elapsed time in millis in the future when the user is allowed to
-     *   attempt to enter his/her lock pattern, or 0 if the user is welcome to
-     *   enter a pattern.
-     */
+* @return The elapsed time in millis in the future when the user is allowed to
+* attempt to enter his/her lock pattern, or 0 if the user is welcome to
+* enter a pattern.
+*/
     public long getLockoutAttemptDeadline() {
         final long deadline = getLong(LOCKOUT_ATTEMPT_DEADLINE, 0L);
         final long now = SystemClock.elapsedRealtime();
@@ -676,30 +717,30 @@ public class LockPatternUtils {
     }
 
     /**
-     * @return Whether the user is permanently locked out until they verify their
-     *   credentials.  Occurs after {@link #FAILED_ATTEMPTS_BEFORE_RESET} failed
-     *   attempts.
-     */
+* @return Whether the user is permanently locked out until they verify their
+* credentials. Occurs after {@link #FAILED_ATTEMPTS_BEFORE_RESET} failed
+* attempts.
+*/
     public boolean isPermanentlyLocked() {
         return getBoolean(LOCKOUT_PERMANENT_KEY);
     }
 
     /**
-     * Set the state of whether the device is permanently locked, meaning the user
-     * must authenticate via other means.
-     *
-     * @param locked Whether the user is permanently locked out until they verify their
-     *   credentials.  Occurs after {@link #FAILED_ATTEMPTS_BEFORE_RESET} failed
-     *   attempts.
-     */
+* Set the state of whether the device is permanently locked, meaning the user
+* must authenticate via other means.
+*
+* @param locked Whether the user is permanently locked out until they verify their
+* credentials. Occurs after {@link #FAILED_ATTEMPTS_BEFORE_RESET} failed
+* attempts.
+*/
     public void setPermanentlyLocked(boolean locked) {
         setBoolean(LOCKOUT_PERMANENT_KEY, locked);
     }
 
     /**
-     * @return A formatted string of the next alarm (for showing on the lock screen),
-     *   or null if there is no next alarm.
-     */
+* @return A formatted string of the next alarm (for showing on the lock screen),
+* or null if there is no next alarm.
+*/
     public String getNextAlarm() {
         String nextAlarm = Settings.System.getString(mContentResolver,
                 Settings.System.NEXT_ALARM_FORMATTED);
@@ -710,10 +751,10 @@ public class LockPatternUtils {
     }
 
     /**
-     * @return A formatted string of the next calendar event with a reminder
-     * (for showing on the lock screen), or null if there is no next event
-     * within a certain look-ahead time.
-     */
+* @return A formatted string of the next calendar event with a reminder
+* (for showing on the lock screen), or null if there is no next event
+* within a certain look-ahead time.
+*/
     public String getNextCalendarAlarm(long lookahead, String[] calendars,
             boolean remindersOnly) {
         long now = System.currentTimeMillis();
@@ -897,19 +938,21 @@ public class LockPatternUtils {
     public boolean isSecure() {
         long mode = getKeyguardStoredPasswordQuality();
         final boolean isPattern = mode == DevicePolicyManager.PASSWORD_QUALITY_SOMETHING;
+	final boolean isFinger = mode == DevicePolicyManager.PASSWORD_QUALITY_FINGER;
         final boolean isPassword = mode == DevicePolicyManager.PASSWORD_QUALITY_NUMERIC
                 || mode == DevicePolicyManager.PASSWORD_QUALITY_ALPHABETIC
                 || mode == DevicePolicyManager.PASSWORD_QUALITY_ALPHANUMERIC;
         final boolean secure = isPattern && isLockPatternEnabled() && savedPatternExists()
+		|| isFinger && isLockFingerEnabled() && savedFingerExists()
                 || isPassword && savedPasswordExists();
         return secure;
     }
 
     /**
-     * Sets the text on the emergency button to indicate what action will be taken.
-     * If there's currently a call in progress, the button will take them to the call
-     * @param button the button to update
-     */
+* Sets the text on the emergency button to indicate what action will be taken.
+* If there's currently a call in progress, the button will take them to the call
+* @param button the button to update
+*/
     public void updateEmergencyCallButtonState(Button button) {
         int newState = TelephonyManager.getDefault().getCallState();
         int textId;
@@ -927,11 +970,11 @@ public class LockPatternUtils {
     }
 
     /**
-     * Resumes a call in progress. Typically launched from the EmergencyCall button
-     * on various lockscreens.
-     *
-     * @return true if we were able to tell InCallScreen to show.
-     */
+* Resumes a call in progress. Typically launched from the EmergencyCall button
+* on various lockscreens.
+*
+* @return true if we were able to tell InCallScreen to show.
+*/
     public boolean resumeCall() {
         ITelephony phone = ITelephony.Stub.asInterface(ServiceManager.checkService("phone"));
         try {
@@ -942,5 +985,44 @@ public class LockPatternUtils {
             // What can we do?
         }
         return false;
+    }
+
+    public int fingerprintUnlock(String sScreen, Context ctx) {
+        int iResult = 0;
+
+        try {
+            if (! (Boolean) AuthentecMobile.getMethod("AM2ClientLibraryLoaded").invoke(am)) {
+                return AM_STATUS.getDeclaredField("eAM_STATUS_LIBRARY_NOT_AVAILABLE").getInt(AM_STATUS);
+            }
+
+            if(null == ctx){
+                return AM_STATUS.getDeclaredField("eAM_STATUS_INVALID_PARAMETER").getInt(AM_STATUS);
+            }
+
+            //int iResult = TSM.LAP(ctx).verify().viaGfxScreen(sScreen).exec();
+            Class partTypes[] = new Class[1];
+            Object argList[] = new Object[1];
+
+            partTypes[0] = Context.class;
+            argList[0] = ctx;
+            Object TSMi = TSM.getMethod("LAP", partTypes).invoke(null, argList);
+
+            TSM.getMethod("verify").invoke(TSMi);
+
+            partTypes[0] = String.class;
+            argList[0] = sScreen;
+            TSM.getMethod("viaGfxScreen", partTypes).invoke(TSMi, argList);
+
+            iResult = (Integer) TSM.getMethod("exec").invoke(TSMi);
+            TSMi = null;
+
+            try {
+                Thread.sleep(1500);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        } catch (Exception e){e.printStackTrace();}
+
+        return iResult;
     }
 }
